@@ -1,18 +1,19 @@
 import { NowRequest, NowResponse } from "@vercel/node";
 import { sessionSignout } from "../../data/session";
 import {
-    forbiddenRequest,
-    serverError,
-    clientError,
     okRequest,
     signoutRequestType,
-    signoutRequestHeaderContentType,
+    signoutResponseHeaderContentType,
 } from "../../constants";
 import { zuluNow } from "../../utils/helper";
+import allowCors from "../../utils/cors";
 
-export default async function (req: NowRequest, res: NowResponse) {
+const signout = async (req: NowRequest, res: NowResponse) => {
+    // set response status code and header type
+    res.statusCode = okRequest;
+    res.setHeader("content-type", signoutResponseHeaderContentType);
+
     if (req.method != signoutRequestType) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "invalid request method",
         });
@@ -20,7 +21,6 @@ export default async function (req: NowRequest, res: NowResponse) {
     }
 
     if (!req.headers["authorization"]) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "invalid authorization",
         });
@@ -30,7 +30,6 @@ export default async function (req: NowRequest, res: NowResponse) {
     let authorization = req.headers["authorization"];
 
     if (!authorization.includes(" ")) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "invalid authorization",
         });
@@ -41,9 +40,8 @@ export default async function (req: NowRequest, res: NowResponse) {
 
     let Bearer = authorizationSplits[0];
     let token = authorizationSplits[1];
-    
+
     if (Bearer != "Bearer") {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "invalid authorization",
         });
@@ -57,18 +55,17 @@ export default async function (req: NowRequest, res: NowResponse) {
     const { data, error } = await sessionSignout(token, obj);
 
     if (error) {
-        res.statusCode = serverError;
         res.send({ message: "Signout Failed" });
         return;
     }
 
     if (!data) {
-        res.statusCode = clientError;
         res.send({ message: "Signout Failed" });
         return;
     }
 
-    res.statusCode = okRequest;
     res.send({ message: "success" });
     return;
-}
+};
+
+export default allowCors(signout);

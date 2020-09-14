@@ -4,9 +4,9 @@ import { getUserByEmail, insertOneUser } from "../../data/user";
 import {
     getVerificationRequestByUserId,
     insertOneVerificationRequest,
+    updateVerificationRequestByPk,
 } from "../../data/verificationRequest";
 import {
-    forbiddenRequest,
     authRequestHeaderContentType,
     validSigninMode,
     validSignupMode,
@@ -15,17 +15,22 @@ import {
     authRequestType,
     verificationRequestExpiryMinutes,
     forProject,
-    serverError,
+    authResponseHeaderContentType,
 } from "../../constants";
 import {
     addMinutesToZuluNow,
     zuluNowIsBeforeZuluParse,
+    zuluNow,
 } from "../../utils/helper";
+import allowCors from "../../utils/cors";
 
-export default async (req: NowRequest, res: NowResponse) => {
+const auth = async (req: NowRequest, res: NowResponse) => {
+    // set response status code and header type
+    res.statusCode = okRequest;
+    res.setHeader("content-type", authResponseHeaderContentType);
+
     // check the request method
     if (req.method != authRequestType) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "invalid request method",
         });
@@ -34,7 +39,6 @@ export default async (req: NowRequest, res: NowResponse) => {
 
     // check request header content_type
     if (req.headers["content-type"] != authRequestHeaderContentType) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "invalid request header content-type",
         });
@@ -43,7 +47,6 @@ export default async (req: NowRequest, res: NowResponse) => {
 
     // check request body data
     if (!req.body) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "got empty request body",
         });
@@ -52,7 +55,6 @@ export default async (req: NowRequest, res: NowResponse) => {
 
     // check email field in request body
     if (!req.body.email || !req.body.mode) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "required data is missing in request body",
         });
@@ -64,7 +66,6 @@ export default async (req: NowRequest, res: NowResponse) => {
 
     // check mode value
     if (req.body.mode != validSigninMode && req.body.mode != validSignupMode) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "invalid mode in request body",
         });
@@ -73,7 +74,6 @@ export default async (req: NowRequest, res: NowResponse) => {
 
     // check email syntax with regex
     if (!emailRegex.test(email)) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "invalid email syntax in request body",
         });
@@ -93,7 +93,6 @@ export default async (req: NowRequest, res: NowResponse) => {
 
     // check userError occurence
     if (userError) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "error occured while fetching user data",
         });
@@ -103,7 +102,6 @@ export default async (req: NowRequest, res: NowResponse) => {
     if (mode == validSigninMode) {
         // user existence in db
         if (!user) {
-            res.statusCode = forbiddenRequest;
             res.send({
                 message: "user not found, send request for signup first",
             });
@@ -112,7 +110,6 @@ export default async (req: NowRequest, res: NowResponse) => {
 
         // check user is_enabled
         if (!user.is_enabled) {
-            res.statusCode = forbiddenRequest;
             res.send({
                 message: "user is disabled for suspicious actions",
             });
@@ -121,7 +118,6 @@ export default async (req: NowRequest, res: NowResponse) => {
 
         // check completion of user signup verification
         if (!user.email_verified) {
-            res.statusCode = forbiddenRequest;
             res.send({
                 message: "user cant signin, complete signup verification first",
             });
@@ -143,7 +139,6 @@ export default async (req: NowRequest, res: NowResponse) => {
             let insertedUserError = insertedUserOutput.error;
 
             if (insertedUserError) {
-                res.statusCode = forbiddenRequest;
                 res.send({
                     message: "error occured while inserting user data",
                 });
@@ -152,7 +147,6 @@ export default async (req: NowRequest, res: NowResponse) => {
 
             // check insertion of user
             if (!insertedUser) {
-                res.statusCode = forbiddenRequest;
                 res.send({
                     message: "user not inserted",
                 });
@@ -164,7 +158,6 @@ export default async (req: NowRequest, res: NowResponse) => {
         } else {
             // check user is_enabled
             if (!user.is_enabled) {
-                res.statusCode = forbiddenRequest;
                 res.send({
                     message: "user is disabled for suspicious actions",
                 });
@@ -173,7 +166,6 @@ export default async (req: NowRequest, res: NowResponse) => {
 
             // check user email verified
             if (user.email_verified) {
-                res.statusCode = forbiddenRequest;
                 res.send({
                     message: "user is already signedup, signin to get access",
                 });
@@ -193,7 +185,6 @@ export default async (req: NowRequest, res: NowResponse) => {
     let verificationRequestError = verificationRequestOutput.error;
 
     if (verificationRequestError) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "error occured while fetching previous request data",
         });
@@ -204,11 +195,22 @@ export default async (req: NowRequest, res: NowResponse) => {
     if (verificationRequest) {
         // check previous request expiration
         if (zuluNowIsBeforeZuluParse(verificationRequest.expires_at)) {
-            res.statusCode = forbiddenRequest;
-            res.send({
-                message: "unexpired request exists",
-            });
-            return;
+            // expire previous verification request
+            const updatedVerificationRequestOutput = await updateVerificationRequestByPk(
+                verificationRequest.id,
+                {
+                    updated_at: zuluNow(),
+                    expires_at: zuluNow(),
+                }
+            );
+
+            if (updatedVerificationRequestOutput.error) {
+                res.send({
+                    message:
+                        "error occured while expiring previous verification request",
+                });
+                return;
+            }
         }
     }
 
@@ -231,7 +233,6 @@ export default async (req: NowRequest, res: NowResponse) => {
         insertedVerificationRequestOutput.error;
 
     if (insertedVerificationRequestError) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "error occured while inserting verification request",
         });
@@ -240,7 +241,6 @@ export default async (req: NowRequest, res: NowResponse) => {
 
     // check insertion of verification request
     if (!insertedVerificationRequest) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "verification request not inserted",
         });
@@ -255,22 +255,23 @@ export default async (req: NowRequest, res: NowResponse) => {
     const mailerOutput = await mailer(
         email,
         mode,
-        `${process.env.site}/api/v1/confirm?email=${email}&mode=${mode}&token=${token}`,
+        `${process.env.serverSite}/api/v1/confirm?email=${email}&mode=${mode}&token=${token}`,
         forProject
     );
 
     if (mailerOutput.error) {
-        res.statusCode = serverError;
         res.send({
             message: "Error Occured while sending email",
         });
         return;
     }
 
-    res.statusCode = okRequest;
     res.send({
         message: "success",
         pollId: pollId,
+        email: email,
     });
     return;
 };
+
+export default allowCors(auth);

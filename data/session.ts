@@ -26,6 +26,32 @@ export const getSessionByRequestId = async (requestId) => {
     return output;
 };
 
+export const getSessionByToken = async (token) => {
+    const query = `query ($token: String!){
+        session(where: {token: {_eq: $token}}, order_by: {created_at: desc}, limit: 1) {
+            id
+            token
+            created_at
+            expires_at
+            user_id
+        }
+    }`;
+    const variables = { token: token };
+
+    let output = { data: null, error: null };
+    await fetcher(query, variables)
+        .then((data) => {
+            if (data.session && data.session.length > 0) {
+                output.data = data.session[0];
+            }
+        })
+        .catch((error) => {
+            console.log("getSessionByRequestId", error);
+            output.error = error;
+        });
+    return output;
+};
+
 export const sessionSignout = async (token, obj) => {
     const query = `mutation ($token:String!, $setSession:session_set_input!){
         update_session(where: {token: {_eq: $token}}, _set: $setSession) {
