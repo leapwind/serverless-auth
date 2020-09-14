@@ -1,9 +1,15 @@
 import { NowRequest, NowResponse } from "@vercel/node";
-import { okRequest } from "../../constants";
+import { okRequest, indexResponseHeaderContentType } from "../../constants";
+import allowCors from "../../utils/cors";
 
-export default function (req: NowRequest, res: NowResponse) {
+const index = async (req: NowRequest, res: NowResponse) => {
+    // set response status code and header type
     res.statusCode = okRequest;
+    res.setHeader("content-type", indexResponseHeaderContentType);
+
     res.send({
         message: "success",
     });
-}
+};
+
+export default allowCors(index);

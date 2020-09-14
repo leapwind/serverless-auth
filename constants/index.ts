@@ -5,12 +5,21 @@ export const emailRegex = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)
 export const authRequestType = "POST";
 export const confirmRequestType = "GET";
 export const signoutRequestType = "POST";
+export const statusRequestType = "POST";
 export const verifyRequestType = "POST";
 
-// Headers
+// Request Headers
 export const authRequestHeaderContentType = "application/json";
 export const verifyRequestHeaderContentType = "application/json";
 export const signoutRequestHeaderContentType = "application/json";
+
+// Response Headers
+export const authResponseHeaderContentType = "application/json";
+export const confirmResponseHeaderContentType = "application/json";
+export const indexResponseHeaderContentType = "application/json";
+export const verifyResponseHeaderContentType = "application/json";
+export const signoutResponseHeaderContentType = "application/json";
+export const statusResponseHeaderContentType = "application/json";
 
 // Modes
 export const validSigninMode = "signin";
@@ -18,6 +27,7 @@ export const validSignupMode = "signup";
 
 // Status Codes
 export const forbiddenRequest = 403;
+export const badRequest = 400;
 export const serverError = 502;
 export const clientError = 400;
 export const okRequest = 200;

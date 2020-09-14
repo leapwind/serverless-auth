@@ -4,36 +4,37 @@ import {
     updateVerificationRequestByPk,
 } from "../../data/verificationRequest";
 import {
-    forbiddenRequest,
     validSignupMode,
     validSigninMode,
     emailRegex,
     confirmRequestType,
     okRequest,
+    confirmResponseHeaderContentType,
 } from "../../constants";
 import { updateUserByPk } from "../../data/user";
 import { insertOneSession } from "../../data/session";
 import { signJWToken } from "../../utils/jwt";
 import { zuluNow, zuluNowIsAfterZuluParse } from "../../utils/helper";
+import allowCors from "../../utils/cors";
 
-export default async (req: NowRequest, res: NowResponse) => {
+const confirm = async (req: NowRequest, res: NowResponse) => {
+    // set response status code and header type
+    res.statusCode = okRequest;
+    res.setHeader("content-type", confirmResponseHeaderContentType);
+
     // check the request method
     if (req.method != confirmRequestType) {
-        res.statusCode = forbiddenRequest;
         res.send({
             message: "invalid request method",
         });
-        console.log("/confirm", "invalid request method");
         return;
     }
 
     // check for required data in request query
     if (!req.query.email || !req.query.token || !req.query.mode) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "required data is missing in request query",
+            message: "invalid request method",
         });
-        console.log("/confirm", "invalid request method");
         return;
     }
 
@@ -42,21 +43,17 @@ export default async (req: NowRequest, res: NowResponse) => {
 
     // check mode value
     if (mode != validSignupMode && mode != validSigninMode) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "invalid confirmation request",
+            message: "invalid mode",
         });
-        console.log("/confirm", "invalid mode");
         return;
     }
 
     // check email syntax with regex
     if (!emailRegex.test(email.toString())) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "invalid confirmation request",
+            message: "invalid email syntax",
         });
-        console.log("/confirm", "invalid email syntax");
         return;
     }
 
@@ -80,9 +77,8 @@ export default async (req: NowRequest, res: NowResponse) => {
     let verificationRequestError = verificationRequestOutput.error;
 
     if (verificationRequestError) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "invalid confirmation request",
+            message: "error occured while fetching verification request",
         });
         console.log(
             "/confirm",
@@ -93,11 +89,9 @@ export default async (req: NowRequest, res: NowResponse) => {
 
     // check verification_request existence in db
     if (!verificationRequest) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "invalid confirmation request",
+            message: "request not found",
         });
-        console.log("/confirm", "request not found");
         return;
     }
 
@@ -107,50 +101,40 @@ export default async (req: NowRequest, res: NowResponse) => {
 
     // check mode of verification mode
     if (mode != verificationRequest.mode) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "invalid confirmation request",
+            message: "request mode is not similar",
         });
-        console.log("/confirm", "request mode is not similar");
         return;
     }
 
     // check request expiration
     if (zuluNowIsAfterZuluParse(verificationRequest.expires_at)) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "invalid confirmation request",
+            message: "request is expired",
         });
-        console.log("/confirm", "request is expired");
         return;
     }
 
     // check request verification
     if (verificationRequest.is_verified) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "invalid confirmation request",
+            message: "request is already verified",
         });
-        console.log("/confirm", "request is already verified");
         return;
     }
 
     // check email of verification_request user
     if (emailLowered != user.email) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "invalid confirmation request",
+            message: "email not same",
         });
-        console.log("/confirm", "email not same");
         return;
     }
     // check user is_enabled
     if (!user.is_enabled) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "invalid confirmation request",
+            message: "user is disabled",
         });
-        console.log("/confirm", "user is disabled");
         return;
     }
 
@@ -158,11 +142,9 @@ export default async (req: NowRequest, res: NowResponse) => {
     if (mode == validSigninMode) {
         // check email_verified
         if (!user.email_verified) {
-            res.statusCode = forbiddenRequest;
             res.send({
-                message: "invalid confirmation request",
+                message: "email not verified",
             });
-            console.log("/confirm", "email not verified");
             return;
         }
     }
@@ -171,11 +153,9 @@ export default async (req: NowRequest, res: NowResponse) => {
     if (mode == validSignupMode) {
         // check email_verified
         if (user.email_verified) {
-            res.statusCode = forbiddenRequest;
             res.send({
-                message: "invalid confirmation request",
+                message: "email is already verified",
             });
-            console.log("/confirm", "email is already verified");
             return;
         } else {
             // set email_verified of user as true
@@ -199,9 +179,8 @@ export default async (req: NowRequest, res: NowResponse) => {
         updatedVerificationRequestOutput.error;
 
     if (updatedVerificationRequestError) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "invalid confirmation request",
+            message: "error occured while updating verification request",
         });
         console.log(
             "/confirm",
@@ -212,11 +191,9 @@ export default async (req: NowRequest, res: NowResponse) => {
 
     // check verification request update
     if (!updatedVerificationRequest) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "invalid confirmation request",
+            message: "verification request not updated",
         });
-        console.log("/confirm", "verification request not updated");
         return;
     }
 
@@ -238,20 +215,16 @@ export default async (req: NowRequest, res: NowResponse) => {
         let updatedUserError = updatedUserOutput.error;
 
         if (updatedUserError) {
-            res.statusCode = forbiddenRequest;
             res.send({
-                message: "invalid confirmation request",
+                message: "error occured while updating user",
             });
-            console.log("/confirm", "error occured while updating user");
             return;
         }
 
         if (!updatedUser) {
-            res.statusCode = forbiddenRequest;
             res.send({
-                message: "invalid confirmation request",
+                message: "user not updated",
             });
-            console.log("/confirm", "user not updated");
             return;
         }
 
@@ -272,27 +245,24 @@ export default async (req: NowRequest, res: NowResponse) => {
     let insertedSessionError = insertedSessionOutput.error;
 
     if (insertedSessionError) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "invalid confirmation request",
+            message: "error occured while inserting session",
         });
-        console.log("/confirm", "error occured while inserting session");
         return;
     }
 
     // check session insertion
     if (!insertedSession) {
-        res.statusCode = forbiddenRequest;
         res.send({
-            message: "invalid confirmation request",
+            message: "session not inserted",
         });
-        console.log("/confirm", "session not inserted");
         return;
     }
 
-    res.statusCode = okRequest;
     res.send({
         message: "success",
     });
     return;
 };
+
+export default allowCors(confirm);
